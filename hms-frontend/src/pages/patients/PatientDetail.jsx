@@ -1,13 +1,19 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Pencil } from "lucide-react";
 import { getPatient, getPatientHistory } from "../../api/patients";
 import { getPatientPrescriptions } from "../../api/medicalRecords";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import PageHeader from "../../components/ui/PageHeader";
+import Button from "../../components/ui/Button";
+import EditPatientModal from "./EditPatientModal";
+import PatientDocuments from "./PatientDocuments";
 
 export default function PatientDetail() {
   const { id } = useParams();
+  const [editOpen, setEditOpen] = useState(false);
   const { data: patient, isLoading } = useQuery({ queryKey: ["patient", id], queryFn: () => getPatient(id) });
   const { data: history = [] } = useQuery({ queryKey: ["patient-history", id], queryFn: () => getPatientHistory(id), enabled: !!id });
   const { data: prescriptions = [] } = useQuery({ queryKey: ["patient-rx", id], queryFn: () => getPatientPrescriptions(id), enabled: !!id });
@@ -16,7 +22,11 @@ export default function PatientDetail() {
 
   return (
     <div>
-      <PageHeader eyebrow={patient.patient_code} title={patient.full_name} />
+      <PageHeader
+        eyebrow={patient.patient_code}
+        title={patient.full_name}
+        action={<Button variant="outline" onClick={() => setEditOpen(true)}><Pencil size={15} /> Edit Patient</Button>}
+      />
 
       <div className="grid md:grid-cols-3 gap-6">
         <Card className="p-6 md:col-span-1 h-fit">
@@ -27,6 +37,7 @@ export default function PatientDetail() {
             <Row label="Phone" value={patient.phone || "—"} />
             <Row label="Email" value={patient.email || "—"} />
             <Row label="Blood Group" value={patient.blood_group || "—"} />
+            <Row label="Emergency Contact" value={patient.emergency_contact || "—"} />
             <Row label="Address" value={patient.address || "—"} />
           </dl>
         </Card>
@@ -67,8 +78,12 @@ export default function PatientDetail() {
               </ul>
             )}
           </Card>
+
+          <PatientDocuments patientId={id} />
         </div>
       </div>
+
+      <EditPatientModal open={editOpen} onClose={() => setEditOpen(false)} patient={patient} />
     </div>
   );
 }
