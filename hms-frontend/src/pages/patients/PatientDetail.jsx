@@ -1,22 +1,36 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import { Pencil, FilePlus } from "lucide-react";
 import { getPatient, getPatientHistory } from "../../api/patients";
 import { getPatientPrescriptions } from "../../api/medicalRecords";
+import { processPrescription } from "../../api/pharmacy";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import EditPatientModal from "./EditPatientModal";
 import PatientDocuments from "./PatientDocuments";
+import AddMedicalRecordModal from "./AddMedicalRecordModal";
 
 export default function PatientDetail() {
   const { id } = useParams();
+  const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [recordOpen, setRecordOpen] = useState(false);
   const { data: patient, isLoading } = useQuery({ queryKey: ["patient", id], queryFn: () => getPatient(id) });
   const { data: history = [] } = useQuery({ queryKey: ["patient-history", id], queryFn: () => getPatientHistory(id), enabled: !!id });
   const { data: prescriptions = [] } = useQuery({ queryKey: ["patient-rx", id], queryFn: () => getPatientPrescriptions(id), enabled: !!id });
+
+  const process = useMutation({
+    mutationFn: processPrescription,
+    onSuccess: () => {
+      toast.success("Prescription dispensed");
+      qc.invalidateQueries({ queryKey: ["patient-rx", id] });
+    },
+    onError: (e) => toast.error(e.response?.data?.message || "Could not process prescription"),
+  });
 
   if (isLoading) return <div className="text-ink/40 text-sm py-10 text-center">Loading patient…</div>;
 
@@ -25,7 +39,12 @@ export default function PatientDetail() {
       <PageHeader
         eyebrow={patient.patient_code}
         title={patient.full_name}
-        action={<Button variant="outline" onClick={() => setEditOpen(true)}><Pencil size={15} /> Edit Patient</Button>}
+        action={
+          <div className="flex gap-2">
+            <Button onClick={() => setRecordOpen(true)}><FilePlus size={15} /> Add Record</Button>
+            <Button variant="outline" onClick={() => setEditOpen(true)}><Pencil size={15} /> Edit Patient</Button>
+          </div>
+        }
       />
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -72,7 +91,18 @@ export default function PatientDetail() {
                 {prescriptions.map((p) => (
                   <li key={p.id} className="flex items-center justify-between text-sm border-b border-black/5 pb-3 last:border-0">
                     <span>{new Date(p.created_at).toLocaleDateString()} — {p.items?.length || 0} item(s)</span>
-                    <Badge tone={p.status === "dispensed" ? "success" : "warning"}>{p.status}</Badge>
+                    <div className="flex items-center gap-3">
+                      <Badge tone={p.status === "dispensed" ? "success" : "warning"}>{p.status}</Badge>
+                      {p.status !== "dispensed" && (
+                        <button
+                          onClick={() => process.mutate(p.id)}
+                          disabled={process.isPending}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {process.isPending ? "Processing…" : "Dispense"}
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -84,6 +114,7 @@ export default function PatientDetail() {
       </div>
 
       <EditPatientModal open={editOpen} onClose={() => setEditOpen(false)} patient={patient} />
+      <AddMedicalRecordModal open={recordOpen} onClose={() => setRecordOpen(false)} patientId={id} />
     </div>
   );
 }
