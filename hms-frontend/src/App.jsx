@@ -20,6 +20,7 @@ import InvoiceDetail from "./pages/billing/InvoiceDetail";
 import StaffList from "./pages/employees/StaffList";
 import Reports from "./pages/reports/Reports";
 import DepartmentList from "./pages/departments/DepartmentList";
+import UserList from "./pages/users/UserList";
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="billing/:id" element={<InvoiceDetail />} />
           <Route path="staff" element={<StaffList />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="users" element={<UserList />} />
         </Route>
       </Route>
     </Routes>
