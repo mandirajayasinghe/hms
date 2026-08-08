@@ -19,6 +19,7 @@ import InvoiceList from "./pages/billing/InvoiceList";
 import InvoiceDetail from "./pages/billing/InvoiceDetail";
 import StaffList from "./pages/employees/StaffList";
 import Reports from "./pages/reports/Reports";
+import DepartmentList from "./pages/departments/DepartmentList";
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="patients" element={<PatientList />} />
           <Route path="patients/:id" element={<PatientDetail />} />
           <Route path="doctors" element={<DoctorList />} />
+          <Route path="departments" element={<DepartmentList />} />
           <Route path="appointments" element={<AppointmentList />} />
           <Route path="admissions" element={<AdmissionList />} />
           <Route path="laboratory" element={<LabRequests />} />

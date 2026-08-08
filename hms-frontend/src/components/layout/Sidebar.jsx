@@ -1,14 +1,15 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
 import {
   LayoutDashboard, Users, Stethoscope, CalendarClock, BedDouble,
-  FlaskConical, Pill, Receipt, UserCog, BarChart3,
+  FlaskConical, Pill, Receipt, UserCog, BarChart3, Building2,
 } from "lucide-react";
-import { useAuth } from "../../auth/AuthContext";
 
 const items = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, roles: null, end: true },
   { to: "/app/patients", label: "Patients", icon: Users, roles: ["admin","doctor","nurse","receptionist"] },
   { to: "/app/doctors", label: "Doctors", icon: Stethoscope, roles: null },
+  { to: "/app/departments", label: "Departments", icon: Building2, roles: ["admin"] },
   { to: "/app/appointments", label: "Appointments", icon: CalendarClock, roles: ["admin","doctor","nurse","receptionist"] },
   { to: "/app/admissions", label: "Admissions", icon: BedDouble, roles: ["admin","doctor","nurse","receptionist"] },
   { to: "/app/laboratory", label: "Laboratory", icon: FlaskConical, roles: ["admin","doctor","lab_staff","nurse"] },
