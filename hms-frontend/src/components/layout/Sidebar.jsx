@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import {
   LayoutDashboard, Users, Stethoscope, CalendarClock, BedDouble,
-  FlaskConical, Pill, Receipt, UserCog, BarChart3, Building2,
+  FlaskConical, Pill, Receipt, UserCog, BarChart3, Building2, ShieldCheck,
 } from "lucide-react";
 
 const items = [
@@ -17,6 +17,7 @@ const items = [
   { to: "/app/billing", label: "Billing", icon: Receipt, roles: ["admin","accountant","receptionist"] },
   { to: "/app/staff", label: "Staff", icon: UserCog, roles: ["admin"] },
   { to: "/app/reports", label: "Reports", icon: BarChart3, roles: ["admin","accountant"] },
+  { to: "/app/users", label: "Users", icon: ShieldCheck, roles: ["admin"] },
 ];
 
 export default function Sidebar() {
