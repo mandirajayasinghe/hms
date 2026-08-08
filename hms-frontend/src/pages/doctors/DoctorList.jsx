@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, CalendarClock } from "lucide-react";
 import { listDoctors, registerDoctor, updateDoctor } from "../../api/doctors";
 import { listDepartments } from "../../api/departments";
 import { useAuth } from "../../auth/AuthContext";
@@ -10,11 +10,13 @@ import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
+import ScheduleModal from "./ScheduleModal";
 
 export default function DoctorList() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // null = registering new, else editing
+  const [scheduleDoctor, setScheduleDoctor] = useState(null);
   const [form, setForm] = useState({
     fullName: "", email: "", username: "", password: "",
     departmentId: "", specialization: "", qualification: "", consultationFee: "",
@@ -94,13 +96,22 @@ export default function DoctorList() {
           {data.map((d) => (
             <Card key={d.id} className="p-5 relative">
               {user?.role === "admin" && (
-                <button
-                  onClick={() => openEdit(d)}
-                  className="absolute top-4 right-4 text-ink/30 hover:text-primary"
-                  title="Edit doctor"
-                >
-                  <Pencil size={15} />
-                </button>
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <button
+                    onClick={() => setScheduleDoctor(d)}
+                    className="text-ink/30 hover:text-primary"
+                    title="Manage schedule"
+                  >
+                    <CalendarClock size={15} />
+                  </button>
+                  <button
+                    onClick={() => openEdit(d)}
+                    className="text-ink/30 hover:text-primary"
+                    title="Edit doctor"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                </div>
               )}
               <div className="w-10 h-10 rounded-full bg-primary-soft text-primary-dark flex items-center justify-center font-display mb-3">
                 {d.full_name?.[0]}
@@ -141,6 +152,8 @@ export default function DoctorList() {
           </Button>
         </form>
       </Modal>
+
+      <ScheduleModal open={!!scheduleDoctor} onClose={() => setScheduleDoctor(null)} doctor={scheduleDoctor} />
     </div>
   );
 }
