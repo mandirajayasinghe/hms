@@ -16,4 +16,6 @@ router.post("/leaves", ctrl.requestLeave);
 router.patch("/leaves/:id", ctrl.decideLeave);
 router.get("/leaves", ctrl.listLeaves);
 
+router.post("/register", ctrl.registerEmployee);
+
 module.exports = router;
