@@ -1,6 +1,7 @@
 const db = require("../../config/db");
 const ApiError = require("../../utils/ApiError");
 const asyncHandler = require("../../utils/asyncHandler");
+const bcrypt = require("bcryptjs");
 
 exports.list = asyncHandler(async (req, res) => {
   const { rows } = await db.query(
@@ -88,4 +89,43 @@ exports.listLeaves = asyncHandler(async (req, res) => {
      ORDER BY lr.created_at DESC`
   );
   res.json({ success: true, data: rows });
+});
+
+exports.registerEmployee = asyncHandler(async (req, res) => {
+  const { fullName, email, username, password, role, departmentId, designation, dateJoined, salary } = req.body;
+  if (!fullName || !email || !username || !password || !role) {
+    throw new ApiError(400, "fullName, email, username, password, and role are required");
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query("BEGIN");
+
+    const roleRes = await client.query("SELECT id FROM roles WHERE name = $1", [role]);
+    if (!roleRes.rows[0]) throw new ApiError(400, "Invalid role");
+
+    const hash = await bcrypt.hash(password, 12);
+    const userRes = await client.query(
+      `INSERT INTO users (full_name, email, username, password_hash, role_id)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, email, username`,
+      [fullName, email, username, hash, roleRes.rows[0].id]
+    );
+
+    const empRes = await client.query(
+      `INSERT INTO employees (user_id, department_id, designation, date_joined, salary)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [userRes.rows[0].id, departmentId || null, designation, dateJoined || null, salary || null]
+    );
+
+    await client.query("COMMIT");
+    res.status(201).json({
+      success: true,
+      data: { ...empRes.rows[0], full_name: userRes.rows[0].full_name, email: userRes.rows[0].email },
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 });
