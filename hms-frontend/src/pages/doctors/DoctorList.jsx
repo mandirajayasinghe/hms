@@ -11,6 +11,10 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
 import ScheduleModal from "./ScheduleModal";
+import {
+  required, minLength, email, usernameFormat, strongPassword, nonNegativeNumber,
+  validateForm, hasErrors,
+} from "../../utils/validators";
 
 export default function DoctorList() {
   const { user } = useAuth();
@@ -21,10 +25,23 @@ export default function DoctorList() {
     fullName: "", email: "", username: "", password: "",
     departmentId: "", specialization: "", qualification: "", consultationFee: "",
   });
+  const [errors, setErrors] = useState({});
   const qc = useQueryClient();
 
   const { data = [], isLoading } = useQuery({ queryKey: ["doctors"], queryFn: () => listDoctors() });
   const { data: departments = [] } = useQuery({ queryKey: ["departments"], queryFn: listDepartments, enabled: open });
+
+  const registerRules = {
+    fullName: [required("Full name"), minLength("Full name", 2)],
+    email: [required("Email"), email],
+    username: [required("Username"), minLength("Username", 3), usernameFormat],
+    password: [required("Password"), strongPassword],
+    consultationFee: [nonNegativeNumber("Consultation fee")],
+  };
+
+  const editRules = {
+    consultationFee: [nonNegativeNumber("Consultation fee")],
+  };
 
   const register = useMutation({
     mutationFn: registerDoctor,
@@ -49,11 +66,13 @@ export default function DoctorList() {
   const closeModal = () => {
     setOpen(false);
     setEditingId(null);
+    setErrors({});
     setForm({ fullName: "", email: "", username: "", password: "", departmentId: "", specialization: "", qualification: "", consultationFee: "" });
   };
 
   const openEdit = (d) => {
     setEditingId(d.id);
+    setErrors({});
     setForm({
       fullName: d.full_name || "", email: "", username: "", password: "",
       departmentId: d.department_id || "", specialization: d.specialization || "",
@@ -62,8 +81,18 @@ export default function DoctorList() {
     setOpen(true);
   };
 
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
   const submit = (e) => {
     e.preventDefault();
+    const rules = editingId ? editRules : registerRules;
+    const validationErrors = validateForm(form, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+
     if (editingId) {
       update.mutate({
         id: editingId,
@@ -126,27 +155,31 @@ export default function DoctorList() {
       )}
 
       <Modal open={open} onClose={closeModal} title={editingId ? "Edit Doctor" : "Register Doctor"}>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           {!editingId && (
             <>
-              <Input label="Full name" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+              <Input label="Full name" value={form.fullName} onChange={handleChange("fullName")} error={errors.fullName} />
               <div className="grid grid-cols-2 gap-3">
-                <Input label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                <Input label="Username" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+                <Input label="Email" type="email" value={form.email} onChange={handleChange("email")} error={errors.email} />
+                <Input label="Username" value={form.username} onChange={handleChange("username")} error={errors.username} />
               </div>
-              <Input label="Temporary password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              <Input label="Temporary password" type="password" value={form.password} onChange={handleChange("password")} error={errors.password} />
             </>
           )}
           <Select
             label="Department" value={form.departmentId}
-            onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+            onChange={handleChange("departmentId")}
             options={[{ value: "", label: "Unassigned" }, ...departments.map((d) => ({ value: d.id, label: d.name }))]}
           />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Specialization" value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} />
-            <Input label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} />
+            <Input label="Specialization" value={form.specialization} onChange={handleChange("specialization")} />
+            <Input label="Qualification" value={form.qualification} onChange={handleChange("qualification")} />
           </div>
-          <Input label="Consultation fee" type="number" step="0.01" value={form.consultationFee} onChange={(e) => setForm({ ...form, consultationFee: e.target.value })} />
+          <Input
+            label="Consultation fee" type="number" step="0.01"
+            value={form.consultationFee} onChange={handleChange("consultationFee")}
+            error={errors.consultationFee}
+          />
           <Button type="submit" className="w-full" disabled={register.isPending || update.isPending}>
             {editingId ? (update.isPending ? "Saving…" : "Save Changes") : (register.isPending ? "Registering…" : "Register Doctor")}
           </Button>

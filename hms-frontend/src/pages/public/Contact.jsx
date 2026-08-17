@@ -5,15 +5,33 @@ import PublicNav from "../../components/PublicNav";
 import { Footer } from "./Home";
 import { Input } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { required, email as emailRule, validateForm, hasErrors } from "../../utils/validators";
+
+const rules = {
+  name: [required("Full name")],
+  email: [required("Email"), emailRule],
+  message: [required("Message")],
+};
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
 
   const submit = (e) => {
     e.preventDefault();
+    const validationErrors = validateForm(form, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+
     // No public "contact" endpoint on the backend yet — this simply confirms receipt client-side.
     toast.success("Message received — our front desk will call you back shortly.");
     setForm({ name: "", email: "", message: "" });
+    setErrors({});
   };
 
   return (
@@ -35,16 +53,21 @@ export default function Contact() {
           </div>
         </div>
 
-        <form onSubmit={submit} className="bg-surface rounded-2xl shadow-card border border-black/5 p-7 space-y-4 h-fit">
-          <Input label="Full name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <form onSubmit={submit} noValidate className="bg-surface rounded-2xl shadow-card border border-black/5 p-7 space-y-4 h-fit">
+          <Input label="Full name" value={form.name} onChange={handleChange("name")} error={errors.name} />
+          <Input label="Email" type="email" value={form.email} onChange={handleChange("email")} error={errors.email} />
           <label className="block">
             <span className="block text-xs font-medium text-ink/60 mb-1.5">Message</span>
             <textarea
-              rows={4} required value={form.message}
-              onChange={(e) => setForm({ ...form, message: e.target.value })}
-              className="w-full rounded-lg border border-black/10 bg-canvas/50 px-3.5 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+              rows={4} value={form.message}
+              onChange={handleChange("message")}
+              className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors ${
+                errors.message
+                  ? "border-accent bg-accent-soft/20 focus:border-accent focus:ring-1 focus:ring-accent"
+                  : "border-black/10 bg-canvas/50 focus:border-primary focus:ring-1 focus:ring-primary"
+              }`}
             />
+            {errors.message && <p className="text-xs text-accent mt-1">{errors.message}</p>}
           </label>
           <Button type="submit" className="w-full">Send Message</Button>
         </form>

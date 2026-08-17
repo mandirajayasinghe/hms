@@ -5,6 +5,14 @@ import { updatePatient } from "../../api/patients";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
+import { required, minLength, email, phone, pastOrTodayDate, validateForm, hasErrors } from "../../utils/validators";
+
+const rules = {
+  fullName: [required("Full name"), minLength("Full name", 2)],
+  phone: [phone],
+  email: [email],
+  dateOfBirth: [pastOrTodayDate("Date of birth")],
+};
 
 export default function EditPatientModal({ open, onClose, patient }) {
   const qc = useQueryClient();
@@ -12,6 +20,7 @@ export default function EditPatientModal({ open, onClose, patient }) {
     fullName: "", phone: "", email: "", dateOfBirth: "", gender: "male",
     address: "", bloodGroup: "", emergencyContact: "",
   });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (patient) {
@@ -25,6 +34,7 @@ export default function EditPatientModal({ open, onClose, patient }) {
         bloodGroup: patient.blood_group || "",
         emergencyContact: patient.emergency_contact || "",
       });
+      setErrors({});
     }
   }, [patient]);
 
@@ -39,24 +49,37 @@ export default function EditPatientModal({ open, onClose, patient }) {
     onError: (e) => toast.error(e.response?.data?.message || "Could not update patient"),
   });
 
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm(form, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+    update.mutate();
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="Edit Patient">
-      <form onSubmit={(e) => { e.preventDefault(); update.mutate(); }} className="space-y-4">
-        <Input label="Full name" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <Input label="Full name" value={form.fullName} onChange={handleChange("fullName")} error={errors.fullName} />
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Input label="Phone" value={form.phone} onChange={handleChange("phone")} error={errors.phone} />
+          <Input label="Email" type="email" value={form.email} onChange={handleChange("email")} error={errors.email} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Date of birth" type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} />
-          <Select label="Gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}
+          <Input label="Date of birth" type="date" value={form.dateOfBirth} onChange={handleChange("dateOfBirth")} error={errors.dateOfBirth} />
+          <Select label="Gender" value={form.gender} onChange={handleChange("gender")}
             options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }]} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Blood group" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-          <Input label="Emergency contact" value={form.emergencyContact} onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })} />
+          <Input label="Blood group" value={form.bloodGroup} onChange={handleChange("bloodGroup")} />
+          <Input label="Emergency contact" value={form.emergencyContact} onChange={handleChange("emergencyContact")} />
         </div>
-        <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        <Input label="Address" value={form.address} onChange={handleChange("address")} />
         <Button type="submit" className="w-full" disabled={update.isPending}>
           {update.isPending ? "Saving…" : "Save Changes"}
         </Button>
