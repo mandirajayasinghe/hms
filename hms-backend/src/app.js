@@ -26,7 +26,16 @@ const reportsRoutes = require("./modules/reports/reportsRoutes");
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.clientOrigin, credentials: true }));
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || env.clientOrigin.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
 app.use(compression());
 app.use(morgan(env.nodeEnv === "development" ? "dev" : "combined"));
 app.use(express.json({ limit: "2mb" }));

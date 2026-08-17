@@ -18,5 +18,5 @@ module.exports = {
   },
   uploadDir: process.env.UPLOAD_DIR || "uploads",
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB || 10),
-  clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+  clientOrigin: (process.env.CLIENT_ORIGIN || "http://localhost:5173").split(",").map(s => s.trim()),
 };
