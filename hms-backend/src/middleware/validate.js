@@ -5,7 +5,11 @@ module.exports = function validate(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      return next(new ApiError(400, "Validation failed", result.error.flatten()));
+      const fieldErrors = result.error.flatten().fieldErrors;
+      const firstError = Object.values(fieldErrors)[0]?.[0] || "Validation failed";
+      return next(
+        new ApiError(400, firstError, { fields: fieldErrors })
+      );
     }
     req.body = result.data;
     next();
