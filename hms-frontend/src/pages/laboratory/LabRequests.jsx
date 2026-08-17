@@ -13,16 +13,30 @@ import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
-import { Select } from "../../components/ui/Input";
+import { Select, Input } from "../../components/ui/Input";
+import { required, minLength, nonNegativeNumber, validateForm, hasErrors } from "../../utils/validators";
 
 const statusTone = { requested: "warning", sample_collected: "neutral", result_entered: "success", report_ready: "success" };
+
+const requestRules = {
+  patientId: [required("Patient")],
+  doctorId: [required("Doctor")],
+  testId: [required("Test")],
+};
+
+const catalogRules = {
+  name: [required("Test name"), minLength("Test name", 2)],
+  price: [nonNegativeNumber("Price")],
+};
 
 export default function LabRequests() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ patientId: "", doctorId: "", testId: "" });
+  const [errors, setErrors] = useState({});
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogForm, setCatalogForm] = useState({ name: "", price: "" });
+  const [catalogErrors, setCatalogErrors] = useState({});
 
   const { data = [], isLoading } = useQuery({ queryKey: ["lab-requests"], queryFn: () => listLabRequests() });
   const { data: catalog = [] } = useQuery({ queryKey: ["lab-catalog"], queryFn: listLabCatalog });
@@ -34,8 +48,7 @@ export default function LabRequests() {
     onSuccess: () => {
       toast.success("Test requested");
       qc.invalidateQueries({ queryKey: ["lab-requests"] });
-      setOpen(false);
-      setForm({ patientId: "", doctorId: "", testId: "" });
+      closeRequestModal();
     },
     onError: (e) => toast.error(e.response?.data?.message || "Could not request test"),
   });
@@ -61,17 +74,40 @@ export default function LabRequests() {
       toast.success("Test added to catalog");
       qc.invalidateQueries({ queryKey: ["lab-catalog"] });
       setCatalogForm({ name: "", price: "" });
+      setCatalogErrors({});
     },
     onError: (e) => toast.error(e.response?.data?.message || "Could not add test"),
   });
 
+  const closeRequestModal = () => {
+    setOpen(false);
+    setErrors({});
+    setForm({ patientId: "", doctorId: "", testId: "" });
+  };
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const handleCatalogChange = (field) => (e) => {
+    setCatalogForm({ ...catalogForm, [field]: e.target.value });
+    if (catalogErrors[field]) setCatalogErrors({ ...catalogErrors, [field]: "" });
+  };
+
   const submit = (e) => {
     e.preventDefault();
+    const validationErrors = validateForm(form, requestRules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
     request.mutate(form);
   };
 
   const submitCatalog = (e) => {
     e.preventDefault();
+    const validationErrors = validateForm(catalogForm, catalogRules);
+    setCatalogErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
     createCatalog.mutate({ name: catalogForm.name, price: Number(catalogForm.price || 0) });
   };
 
@@ -126,13 +162,13 @@ export default function LabRequests() {
         />
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Request Lab Test">
-        <form onSubmit={submit} className="space-y-4">
-          <Select label="Patient" required value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}
+      <Modal open={open} onClose={closeRequestModal} title="Request Lab Test">
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Select label="Patient" value={form.patientId} onChange={handleChange("patientId")} error={errors.patientId}
             options={[{ value: "", label: "Select patient" }, ...patients.map((p) => ({ value: p.id, label: p.full_name }))]} />
-          <Select label="Doctor" required value={form.doctorId} onChange={(e) => setForm({ ...form, doctorId: e.target.value })}
+          <Select label="Doctor" value={form.doctorId} onChange={handleChange("doctorId")} error={errors.doctorId}
             options={[{ value: "", label: "Select doctor" }, ...doctors.map((d) => ({ value: d.id, label: `Dr. ${d.full_name}` }))]} />
-          <Select label="Test" required value={form.testId} onChange={(e) => setForm({ ...form, testId: e.target.value })}
+          <Select label="Test" value={form.testId} onChange={handleChange("testId")} error={errors.testId}
             options={[{ value: "", label: "Select test" }, ...catalog.map((c) => ({ value: c.id, label: `${c.name} — Rs ${Number(c.price).toLocaleString()}` }))]} />
           <Button type="submit" className="w-full" disabled={request.isPending}>
             {request.isPending ? "Requesting…" : "Request Test"}
@@ -140,25 +176,21 @@ export default function LabRequests() {
         </form>
       </Modal>
 
-      <Modal open={catalogOpen} onClose={() => setCatalogOpen(false)} title="Manage Test Catalog">
+      <Modal open={catalogOpen} onClose={() => { setCatalogOpen(false); setCatalogErrors({}); }} title="Manage Test Catalog">
         <div className="space-y-5">
-          <form onSubmit={submitCatalog} className="space-y-3">
-            <div className="grid grid-cols-3 gap-2 items-end">
+          <form onSubmit={submitCatalog} noValidate className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 items-start">
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-ink/60 mb-1.5">Test name</label>
-                <input
-                  required value={catalogForm.name}
-                  onChange={(e) => setCatalogForm({ ...catalogForm, name: e.target.value })}
-                  className="w-full rounded-lg border border-black/10 bg-canvas/50 px-3.5 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                <Input
+                  label="Test name" value={catalogForm.name}
+                  onChange={handleCatalogChange("name")} error={catalogErrors.name}
                   placeholder="e.g. Complete Blood Count"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink/60 mb-1.5">Price</label>
-                <input
-                  type="number" step="0.01" value={catalogForm.price}
-                  onChange={(e) => setCatalogForm({ ...catalogForm, price: e.target.value })}
-                  className="w-full rounded-lg border border-black/10 bg-canvas/50 px-3.5 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                <Input
+                  label="Price" type="number" step="0.01" value={catalogForm.price}
+                  onChange={handleCatalogChange("price")} error={catalogErrors.price}
                 />
               </div>
             </div>

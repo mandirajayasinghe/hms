@@ -11,6 +11,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
+import { required, positiveNumber } from "../../utils/validators";
 
 const statusTone = { paid: "success", partial: "warning", unpaid: "danger" };
 const categories = ["consultation", "laboratory", "pharmacy", "admission"];
@@ -23,6 +24,8 @@ export default function InvoiceList() {
   const [open, setOpen] = useState(false);
   const [patientId, setPatientId] = useState("");
   const [items, setItems] = useState([emptyItem()]);
+  const [patientError, setPatientError] = useState("");
+  const [itemErrors, setItemErrors] = useState([]);
 
   const { data = [], isLoading } = useQuery({ queryKey: ["invoices"], queryFn: () => listInvoices() });
   const { data: patients = [] } = useQuery({ queryKey: ["patients-all"], queryFn: () => listPatients({ limit: 200 }), enabled: open });
@@ -42,26 +45,43 @@ export default function InvoiceList() {
     setOpen(false);
     setPatientId("");
     setItems([emptyItem()]);
+    setPatientError("");
+    setItemErrors([]);
   };
 
   const updateItem = (index, field, value) => {
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));
+    setItemErrors((prev) => prev.map((err, i) => (i === index ? { ...err, [field]: "" } : err)));
   };
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
-  const removeItem = (index) => setItems((prev) => prev.filter((_, i) => i !== index));
+  const removeItem = (index) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+    setItemErrors((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const total = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
 
   const submit = (e) => {
     e.preventDefault();
-    const cleanItems = items
-      .filter((it) => it.description && Number(it.amount) > 0)
-      .map((it) => ({ category: it.category, description: it.description, amount: Number(it.amount) }));
-    if (!patientId || cleanItems.length === 0) {
-      toast.error("Select a patient and at least one valid line item");
-      return;
-    }
+
+    const pErr = required("Patient")(patientId);
+    setPatientError(pErr);
+
+    const newItemErrors = items.map((it) => ({
+      description: required("Description")(it.description),
+      amount: it.amount === "" ? "Amount is required" : positiveNumber("Amount")(it.amount),
+    }));
+    setItemErrors(newItemErrors);
+
+    const hasItemErrors = newItemErrors.some((e) => e.description || e.amount);
+    if (pErr || hasItemErrors) return;
+
+    const cleanItems = items.map((it) => ({
+      category: it.category,
+      description: it.description,
+      amount: Number(it.amount),
+    }));
     create.mutate({ patientId, items: cleanItems });
   };
 
@@ -90,16 +110,18 @@ export default function InvoiceList() {
       )}
 
       <Modal open={open} onClose={closeModal} title="Create Invoice">
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <Select
-            label="Patient" required value={patientId} onChange={(e) => setPatientId(e.target.value)}
+            label="Patient" value={patientId}
+            onChange={(e) => { setPatientId(e.target.value); if (patientError) setPatientError(""); }}
+            error={patientError}
             options={[{ value: "", label: "Select patient" }, ...patients.map((p) => ({ value: p.id, label: p.full_name }))]}
           />
 
           <div className="space-y-3">
             <span className="block text-xs font-medium text-ink/60">Line items</span>
             {items.map((item, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2 items-end">
+              <div key={i} className="grid grid-cols-12 gap-2 items-start">
                 <div className="col-span-3">
                   <Select
                     label={i === 0 ? "Category" : undefined}
@@ -114,6 +136,7 @@ export default function InvoiceList() {
                     value={item.description}
                     onChange={(e) => updateItem(i, "description", e.target.value)}
                     placeholder="e.g. General consultation"
+                    error={itemErrors[i]?.description}
                   />
                 </div>
                 <div className="col-span-3">
@@ -122,9 +145,10 @@ export default function InvoiceList() {
                     type="number" step="0.01" min="0"
                     value={item.amount}
                     onChange={(e) => updateItem(i, "amount", e.target.value)}
+                    error={itemErrors[i]?.amount}
                   />
                 </div>
-                <div className="col-span-1 pb-2.5">
+                <div className="col-span-1 pt-2.5">
                   {items.length > 1 && (
                     <button type="button" onClick={() => removeItem(i)} className="text-ink/30 hover:text-accent">
                       <Trash2 size={16} />

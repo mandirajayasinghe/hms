@@ -5,15 +5,31 @@ import toast from "react-hot-toast";
 import { useAuth } from "../../auth/AuthContext";
 import { Input } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { required, validateForm, hasErrors } from "../../utils/validators";
+
+const rules = {
+  username: [required("Username or email")],
+  password: [required("Password")],
+};
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
 
   const submit = async (e) => {
     e.preventDefault();
+    const validationErrors = validateForm(form, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+
     setLoading(true);
     try {
       await login(form.username, form.password);
@@ -43,13 +59,25 @@ export default function Login() {
       <div className="flex items-center justify-center p-8 bg-canvas">
         <motion.form
           onSubmit={submit}
+          noValidate
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
           className="w-full max-w-sm bg-surface rounded-2xl shadow-card border border-black/5 p-8 space-y-5"
         >
           <div className="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center font-display mb-2">+</div>
           <h1 className="font-display text-2xl text-primary-dark">Staff Sign In</h1>
-          <Input label="Username or email" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-          <Input label="Password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <Input
+            label="Username or email"
+            value={form.username}
+            onChange={handleChange("username")}
+            error={errors.username}
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={form.password}
+            onChange={handleChange("password")}
+            error={errors.password}
+          />
           <Button type="submit" className="w-full" disabled={loading}>{loading ? "Signing in…" : "Sign In"}</Button>
         </motion.form>
       </div>

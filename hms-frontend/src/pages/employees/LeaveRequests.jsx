@@ -9,13 +9,28 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
+import { required, validateForm, hasErrors } from "../../utils/validators";
 
 const statusTone = { pending: "warning", approved: "success", rejected: "danger" };
+
+const rules = {
+  employeeId: [required("Employee")],
+  startDate: [required("Start date")],
+  endDate: [required("End date")],
+};
+
+const dateRangeValid = (values) => {
+  if (!values.startDate || !values.endDate) return "";
+  return new Date(values.endDate) >= new Date(values.startDate)
+    ? ""
+    : "End date must be on or after the start date";
+};
 
 export default function LeaveRequests() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ employeeId: "", startDate: "", endDate: "", reason: "" });
+  const [errors, setErrors] = useState({});
 
   const { data = [], isLoading } = useQuery({ queryKey: ["leaves"], queryFn: listLeaves });
   const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: listEmployees, enabled: open });
@@ -25,8 +40,7 @@ export default function LeaveRequests() {
     onSuccess: () => {
       toast.success("Leave request submitted");
       qc.invalidateQueries({ queryKey: ["leaves"] });
-      setOpen(false);
-      setForm({ employeeId: "", startDate: "", endDate: "", reason: "" });
+      closeModal();
     },
     onError: (e) => toast.error(e.response?.data?.message || "Could not submit leave"),
   });
@@ -35,6 +49,29 @@ export default function LeaveRequests() {
     mutationFn: ({ id, status }) => decideLeave(id, status),
     onSuccess: () => { toast.success("Leave updated"); qc.invalidateQueries({ queryKey: ["leaves"] }); },
   });
+
+  const closeModal = () => {
+    setOpen(false);
+    setErrors({});
+    setForm({ employeeId: "", startDate: "", endDate: "", reason: "" });
+  };
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm(form, rules);
+
+    const rangeError = dateRangeValid(form);
+    if (rangeError) validationErrors.endDate = rangeError;
+
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+    create.mutate(form);
+  };
 
   return (
     <Card className="p-6">
@@ -68,15 +105,15 @@ export default function LeaveRequests() {
         />
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Request Leave">
-        <form onSubmit={(e) => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
-          <Select label="Employee" required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+      <Modal open={open} onClose={closeModal} title="Request Leave">
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Select label="Employee" value={form.employeeId} onChange={handleChange("employeeId")} error={errors.employeeId}
             options={[{ value: "", label: "Select employee" }, ...employees.map((e) => ({ value: e.id, label: e.full_name }))]} />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Start date" type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
-            <Input label="End date" type="date" required value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+            <Input label="Start date" type="date" value={form.startDate} onChange={handleChange("startDate")} error={errors.startDate} />
+            <Input label="End date" type="date" value={form.endDate} onChange={handleChange("endDate")} error={errors.endDate} />
           </div>
-          <Input label="Reason" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+          <Input label="Reason" value={form.reason} onChange={handleChange("reason")} />
           <Button type="submit" className="w-full" disabled={create.isPending}>
             {create.isPending ? "Submitting…" : "Submit Request"}
           </Button>

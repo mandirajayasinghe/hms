@@ -5,12 +5,18 @@ import { markAttendance, getAttendance } from "../../api/employees";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
+import { required, validateForm, hasErrors } from "../../utils/validators";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const rules = {
+  date: [required("Date")],
+};
 
 export default function AttendanceModal({ open, onClose, employee }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({ date: today(), status: "present", checkIn: "", checkOut: "" });
+  const [errors, setErrors] = useState({});
 
   const { data: records = [] } = useQuery({
     queryKey: ["attendance", employee?.id],
@@ -27,12 +33,25 @@ export default function AttendanceModal({ open, onClose, employee }) {
     onError: (e) => toast.error(e.response?.data?.message || "Could not record attendance"),
   });
 
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm(form, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+    mark.mutate();
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={`Attendance — ${employee?.full_name || ""}`}>
       <div className="space-y-6">
-        <form onSubmit={(e) => { e.preventDefault(); mark.mutate(); }} className="space-y-3">
-          <Input label="Date" type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-          <Select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+        <form onSubmit={submit} noValidate className="space-y-3">
+          <Input label="Date" type="date" value={form.date} onChange={handleChange("date")} error={errors.date} />
+          <Select label="Status" value={form.status} onChange={handleChange("status")}
             options={[
               { value: "present", label: "Present" },
               { value: "absent", label: "Absent" },
@@ -40,8 +59,8 @@ export default function AttendanceModal({ open, onClose, employee }) {
               { value: "leave", label: "Leave" },
             ]} />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Check-in" type="time" value={form.checkIn} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} />
-            <Input label="Check-out" type="time" value={form.checkOut} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} />
+            <Input label="Check-in" type="time" value={form.checkIn} onChange={handleChange("checkIn")} />
+            <Input label="Check-out" type="time" value={form.checkOut} onChange={handleChange("checkOut")} />
           </div>
           <Button type="submit" className="w-full" disabled={mark.isPending}>
             {mark.isPending ? "Saving…" : "Save Attendance"}

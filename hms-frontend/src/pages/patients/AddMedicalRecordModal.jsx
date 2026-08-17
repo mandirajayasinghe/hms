@@ -9,8 +9,14 @@ import { useAuth } from "../../auth/AuthContext";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
+import { required, validateForm, hasErrors } from "../../utils/validators";
 
 const emptyRxItem = () => ({ medicineId: "", dosage: "", frequency: "", duration: "", instructions: "" });
+
+const rules = {
+  doctorId: [required("Doctor")],
+  diagnosis: [required("Diagnosis")],
+};
 
 export default function AddMedicalRecordModal({ open, onClose, patientId }) {
   const { user } = useAuth();
@@ -21,13 +27,14 @@ export default function AddMedicalRecordModal({ open, onClose, patientId }) {
   const [notes, setNotes] = useState("");
   const [includeRx, setIncludeRx] = useState(false);
   const [rxItems, setRxItems] = useState([emptyRxItem()]);
+  const [errors, setErrors] = useState({});
 
   const { data: doctors = [] } = useQuery({ queryKey: ["doctors"], queryFn: () => listDoctors(), enabled: open });
   const { data: medicines = [] } = useQuery({ queryKey: ["medicines"], queryFn: () => listMedicines(), enabled: open && includeRx });
 
   const reset = () => {
     setDoctorId(""); setDiagnosis(""); setTreatment(""); setNotes("");
-    setIncludeRx(false); setRxItems([emptyRxItem()]);
+    setIncludeRx(false); setRxItems([emptyRxItem()]); setErrors({});
   };
 
   const closeModal = () => { reset(); onClose(); };
@@ -58,20 +65,28 @@ export default function AddMedicalRecordModal({ open, onClose, patientId }) {
   const addRxItem = () => setRxItems((prev) => [...prev, emptyRxItem()]);
   const removeRxItem = (i) => setRxItems((prev) => prev.filter((_, idx) => idx !== i));
 
+  const handleChange = (setter, field) => (e) => {
+    setter(e.target.value);
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
   const submit = (e) => {
     e.preventDefault();
-    if (!doctorId) { toast.error("Select a doctor"); return; }
+    const validationErrors = validateForm({ doctorId, diagnosis }, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
     createRecord.mutate();
   };
 
   return (
     <Modal open={open} onClose={closeModal} title="Add Medical Record">
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} noValidate className="space-y-4">
         <Select
-          label="Doctor" required value={doctorId} onChange={(e) => setDoctorId(e.target.value)}
+          label="Doctor" value={doctorId} onChange={handleChange(setDoctorId, "doctorId")}
+          error={errors.doctorId}
           options={[{ value: "", label: "Select doctor" }, ...doctors.map((d) => ({ value: d.id, label: `Dr. ${d.full_name}` }))]}
         />
-        <Input label="Diagnosis" required value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+        <Input label="Diagnosis" value={diagnosis} onChange={handleChange(setDiagnosis, "diagnosis")} error={errors.diagnosis} />
         <label className="block">
           <span className="block text-xs font-medium text-ink/60 mb-1.5">Treatment</span>
           <textarea

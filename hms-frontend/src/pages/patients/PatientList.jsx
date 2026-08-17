@@ -9,11 +9,20 @@ import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
+import { required, minLength, email, phone, pastOrTodayDate, validateForm, hasErrors } from "../../utils/validators";
+
+const rules = {
+  fullName: [required("Full name"), minLength("Full name", 2)],
+  phone: [phone],
+  email: [email],
+  dateOfBirth: [pastOrTodayDate("Date of birth")],
+};
 
 export default function PatientList() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ fullName: "", phone: "", dateOfBirth: "", gender: "male", email: "" });
+  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -27,11 +36,29 @@ export default function PatientList() {
     onSuccess: () => {
       toast.success("Patient registered");
       qc.invalidateQueries({ queryKey: ["patients"] });
-      setOpen(false);
-      setForm({ fullName: "", phone: "", dateOfBirth: "", gender: "male", email: "" });
+      closeModal();
     },
     onError: (e) => toast.error(e.response?.data?.message || "Failed to register patient"),
   });
+
+  const closeModal = () => {
+    setOpen(false);
+    setErrors({});
+    setForm({ fullName: "", phone: "", dateOfBirth: "", gender: "male", email: "" });
+  };
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm(form, rules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+    mutation.mutate(form);
+  };
 
   return (
     <div>
@@ -66,20 +93,29 @@ export default function PatientList() {
         />
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Register Patient">
-        <form
-          onSubmit={(e) => { e.preventDefault(); mutation.mutate(form); }}
-          className="space-y-4"
-        >
-          <Input label="Full name" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+      <Modal open={open} onClose={closeModal} title="Register Patient">
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Input
+            label="Full name" value={form.fullName}
+            onChange={handleChange("fullName")} error={errors.fullName}
+          />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            <Input label="Date of birth" type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} />
+            <Input
+              label="Phone" value={form.phone}
+              onChange={handleChange("phone")} error={errors.phone}
+            />
+            <Input
+              label="Date of birth" type="date" value={form.dateOfBirth}
+              onChange={handleChange("dateOfBirth")} error={errors.dateOfBirth}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}
+            <Select label="Gender" value={form.gender} onChange={handleChange("gender")}
               options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }]} />
-            <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <Input
+              label="Email" type="email" value={form.email}
+              onChange={handleChange("email")} error={errors.email}
+            />
           </div>
           <Button type="submit" className="w-full" disabled={mutation.isPending}>
             {mutation.isPending ? "Saving…" : "Register Patient"}

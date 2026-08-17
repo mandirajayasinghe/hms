@@ -9,14 +9,31 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
+import {
+  required, minLength, email, usernameFormat, strongPassword, validateForm, hasErrors,
+} from "../../utils/validators";
 
 const roles = ["admin", "doctor", "nurse", "receptionist", "lab_staff", "pharmacist", "accountant"];
+
+const createRules = {
+  fullName: [required("Full name"), minLength("Full name", 2)],
+  email: [required("Email"), email],
+  username: [required("Username"), minLength("Username", 3), usernameFormat],
+  password: [required("Password"), strongPassword],
+  role: [required("Role")],
+};
+
+const resetRules = {
+  newPassword: [required("New password"), strongPassword],
+};
 
 export default function UserList() {
   const [open, setOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState(null);
   const [newPassword, setNewPassword] = useState("");
+  const [resetError, setResetError] = useState("");
   const [form, setForm] = useState({ fullName: "", email: "", username: "", password: "", role: "receptionist" });
+  const [errors, setErrors] = useState({});
   const qc = useQueryClient();
 
   const { data = [], isLoading } = useQuery({ queryKey: ["users"], queryFn: listUsers });
@@ -26,8 +43,7 @@ export default function UserList() {
     onSuccess: () => {
       toast.success("User created");
       qc.invalidateQueries({ queryKey: ["users"] });
-      setOpen(false);
-      setForm({ fullName: "", email: "", username: "", password: "", role: "receptionist" });
+      closeModal();
     },
     onError: (e) => toast.error(e.response?.data?.message || "Could not create user"),
   });
@@ -44,9 +60,42 @@ export default function UserList() {
 
   const resetPw = useMutation({
     mutationFn: () => resetUserPassword(resetTarget.id, newPassword),
-    onSuccess: () => { toast.success("Password reset"); setResetTarget(null); setNewPassword(""); },
+    onSuccess: () => { toast.success("Password reset"); closeResetModal(); },
     onError: (e) => toast.error(e.response?.data?.message || "Could not reset password"),
   });
+
+  const closeModal = () => {
+    setOpen(false);
+    setErrors({});
+    setForm({ fullName: "", email: "", username: "", password: "", role: "receptionist" });
+  };
+
+  const closeResetModal = () => {
+    setResetTarget(null);
+    setNewPassword("");
+    setResetError("");
+  };
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm(form, createRules);
+    setErrors(validationErrors);
+    if (hasErrors(validationErrors)) return;
+    create.mutate(form);
+  };
+
+  const submitReset = (e) => {
+    e.preventDefault();
+    const validationErrors = validateForm({ newPassword }, resetRules);
+    setResetError(validationErrors.newPassword || "");
+    if (hasErrors(validationErrors)) return;
+    resetPw.mutate();
+  };
 
   return (
     <div>
@@ -84,23 +133,27 @@ export default function UserList() {
         />
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add User">
-        <form onSubmit={(e) => { e.preventDefault(); create.mutate(form); }} className="space-y-4">
-          <Input label="Full name" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+      <Modal open={open} onClose={closeModal} title="Add User">
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Input label="Full name" value={form.fullName} onChange={handleChange("fullName")} error={errors.fullName} />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <Input label="Username" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            <Input label="Email" type="email" value={form.email} onChange={handleChange("email")} error={errors.email} />
+            <Input label="Username" value={form.username} onChange={handleChange("username")} error={errors.username} />
           </div>
-          <Input label="Temporary password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          <Select label="Role" required value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+          <Input label="Temporary password" type="password" value={form.password} onChange={handleChange("password")} error={errors.password} />
+          <Select label="Role" value={form.role} onChange={handleChange("role")} error={errors.role}
             options={roles.map((r) => ({ value: r, label: r.replace("_", " ") }))} />
           <Button type="submit" className="w-full" disabled={create.isPending}>{create.isPending ? "Saving…" : "Create User"}</Button>
         </form>
       </Modal>
 
-      <Modal open={!!resetTarget} onClose={() => { setResetTarget(null); setNewPassword(""); }} title={`Reset Password — ${resetTarget?.full_name || ""}`}>
-        <form onSubmit={(e) => { e.preventDefault(); resetPw.mutate(); }} className="space-y-4">
-          <Input label="New password" type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+      <Modal open={!!resetTarget} onClose={closeResetModal} title={`Reset Password — ${resetTarget?.full_name || ""}`}>
+        <form onSubmit={submitReset} noValidate className="space-y-4">
+          <Input
+            label="New password" type="password" value={newPassword}
+            onChange={(e) => { setNewPassword(e.target.value); if (resetError) setResetError(""); }}
+            error={resetError}
+          />
           <Button type="submit" className="w-full" disabled={resetPw.isPending}>{resetPw.isPending ? "Resetting…" : "Reset Password"}</Button>
         </form>
       </Modal>
